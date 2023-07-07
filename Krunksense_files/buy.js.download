@@ -1,0 +1,262 @@
+function uuidv4() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        const r = Math.random() * 16 | 0;
+        const v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+class Gateway {
+    #ws;
+    #uuid;
+    #send;
+
+    static UNKNOWN = -1;
+    static INIT = 0;
+    static IN_PROGRESS = 1;
+    static SUCCESS = 2;
+    static FAILED = 3;
+
+    constructor() {
+        this.state = Gateway.UNKNOWN;
+    }
+
+    kill() {
+        if(!this.#ws) return;
+        this.#ws.onclose = () => {};
+        this.#ws.close();
+    }
+
+    init() {
+        if(!this.#ws || this.#ws.readyState === WebSocket.CLOSED) this.#ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/payment_gateway`);
+        this.#send = (cmd, ...args) => this.#ws.send(JSON.stringify([cmd, ...args]));
+        this.#uuid = localStorage.uuid || uuidv4();
+        localStorage.uuid = this.#uuid;
+
+        this.#ws.onmessage = (e) => {
+            let data = JSON.parse(e.data);
+            let cmd = data[0];
+            let args = data.slice(1);
+
+            switch (cmd) {
+                case 'login_req':
+                    this.#send('login_res', this.#uuid, localStorage.discord_token);
+                    break;
+                case 'login_ack':
+                    if(args[0]) {
+                        this.state = Gateway.INIT;
+                        this.onstatechange(Gateway.INIT, args[1]); // args[1] is the item info (upon success)
+                    } else {
+                        this.state = Gateway.FAILED;
+                        this.onstatechange(Gateway.FAILED, args[1]);
+                        this.kill();
+                    }
+                    break;
+                case 'buy_ack':
+                    if(args[0]) {
+                        this.state = Gateway.IN_PROGRESS;
+                        this.onstatechange(Gateway.IN_PROGRESS, args[1]);
+                    } else {
+                        this.state = Gateway.FAILED;
+                        this.onstatechange(Gateway.FAILED, args[1]);
+                        this.kill();
+                    }
+                    break;
+                case 'payment_ack':
+                    switch(args[0].state) {
+                        case 'finished':
+                            this.state = Gateway.SUCCESS;
+                            this.onstatechange(Gateway.SUCCESS);
+                            this.kill();
+                            break;
+                        case 'failed':
+                        case 'expired':
+                            let messages = {
+                                'failed': 'Transaction failed.',
+                                'expired': 'Transaction expired.'
+                            };
+
+                            this.state = Gateway.FAILED;
+                            this.onstatechange(Gateway.FAILED, messages[args[0].state]);
+                            this.kill();
+                            break;
+                    }
+                    break;
+            }
+        };
+
+        this.#ws.onclose = () => {
+            setTimeout(() => {
+                this.init();
+            }, 1000);
+        };
+
+        this.#ws.onerror = () => {};
+    }
+
+    onstatechange(state, message) {}
+
+    start_buy(currency, ref) {
+        this.#send('buy', currency, ref);
+    }
+}
+
+let gateway;
+let POPUPS = {};
+let product;
+initPopups();
+
+document.getElementById('buy').addEventListener('click', () => {
+    if(!gateway) gateway = new Gateway();
+    gateway.init();
+
+    popup(POPUPS.loading);
+
+    if(product) gateway.onstatechange(Gateway.INIT, product);
+    let pay_currency;
+
+    gateway.onstatechange = (state, message) => {
+        console.log('Gateway state change:', state, message);
+        switch (state) {
+            case Gateway.FAILED:
+                popup(POPUPS.error);
+                document.getElementById('errorPopT').textContent = message;
+                break;
+            case Gateway.INIT:
+                popup(POPUPS.checkout);
+                product = message;
+                document.getElementById('checkoutCart').innerHTML = `
+                    <div class="checkoutItem">${message.name} <span class="right">~${Object.values(message.price)[0]} ${Object.keys(message.price)[0].toUpperCase()}</span></div>
+                `;
+
+                let currency = document.getElementById('checkoutCurrency');
+                currency.innerHTML = '';
+                for(let i = 0; i < Object.keys(message.price).length; i++) {
+                    let option = document.createElement('option');
+                    option.value = Object.keys(message.price)[i];
+                    option.textContent = Object.keys(message.price)[i].toUpperCase();
+                    currency.appendChild(option);
+                }
+
+                currency.addEventListener('change', () => {
+                    document.getElementById('checkoutCart').innerHTML = `
+                        <div class="checkoutItem">${message.name} <span class="right">~${Object.values(message.price)[currency.selectedIndex]} ${Object.keys(message.price)[currency.selectedIndex].toUpperCase()}</span></div>
+                    `;
+                });
+
+                document.getElementById('checkoutRef').style.display = message.allowRef ? 'block' : 'none';
+
+                document.getElementById('checkoutBuy').onclick = () => {
+                    popup(POPUPS.loading);
+                    let ref =  document.getElementById('checkoutRef');
+                    pay_currency = currency.value;
+                    gateway.start_buy(currency.value, ref ? ref.value : '');
+                };
+                break;
+            case Gateway.IN_PROGRESS:
+                popup(POPUPS.please_pay);
+                document.getElementById('paymentT').innerHTML = `Please pay ${message.pay_amount} ${pay_currency ? pay_currency.toUpperCase() : ''}<br>Address: ${message.pay_address}`;
+                break;
+            case Gateway.SUCCESS:
+                popup(POPUPS.success);
+                break;
+            case Gateway.FAILED:
+                popup(POPUPS.error);
+                document.getElementById('errorPopT').textContent = message;
+                break;
+        }
+    };
+});
+
+function popup(innerHTML) {
+    document.getElementById('popup').innerHTML = '';
+    for(let i = 0; i < innerHTML.length; i++) {
+        document.getElementById('popup').insertAdjacentElement('beforeend', innerHTML[i]);
+    }
+    showPopup();
+}
+
+function hidePopup() {
+    document.getElementById('popupCont').classList.add('hide');
+}
+
+function showPopup() {
+    document.getElementById('popupCont').classList.remove('hide');
+}
+
+function initPopups() {
+    let closeBtn = document.createElement('button');
+    closeBtn.classList.add('closeBtn');
+    closeBtn.addEventListener('click', hidePopup);
+    closeBtn.textContent = 'Close';
+
+    POPUPS.loading = Array.from({ length: 2 }, () => document.createElement('div'));
+    POPUPS.loading[0].classList.add('spinner');
+    POPUPS.loading[1].classList.add('t');
+    POPUPS.loading[1].classList.add('loadPopT');
+    POPUPS.loading[1].textContent = 'Loading...';
+
+    POPUPS.error = Array.from({ length: 2 }, () => document.createElement('div'));
+    POPUPS.error.push(closeBtn);
+    POPUPS.error[0].classList.add('error');
+    POPUPS.error[1].classList.add('t');
+    POPUPS.error[1].classList.add('errorPopT');
+    POPUPS.error[1].id = 'errorPopT';
+    POPUPS.error[1].textContent = 'An error occurred.';
+
+    POPUPS.checkout = Array.from({ length: 3 }, () => document.createElement('div'));
+    POPUPS.checkout[0].textContent = 'Checkout';
+    POPUPS.checkout[0].classList.add('t');
+    POPUPS.checkout[0].classList.add('checkoutPopH');
+    POPUPS.checkout[1].classList.add('checkoutPopCart');
+    POPUPS.checkout[1].id = 'checkoutCart';
+
+    POPUPS.checkout.splice(2, 0, document.createElement('select'));
+    POPUPS.checkout[2].classList.add('checkoutPopCurrency');
+    POPUPS.checkout[2].id = 'checkoutCurrency';
+
+    POPUPS.checkout.splice(3, 0, document.createElement('input'));
+    POPUPS.checkout[3].classList.add('checkoutPopRef');
+    POPUPS.checkout[3].id = 'checkoutRef';
+    POPUPS.checkout[3].placeholder = 'Referral code (optional)';
+    POPUPS.checkout[3].type = 'text';
+    
+    let buy = document.createElement('button');
+    buy.classList.add('buyBtn');
+    buy.textContent = 'Buy';
+    buy.id = 'checkoutBuy';
+    
+    POPUPS.checkout[4].appendChild(buy);
+    POPUPS.checkout[4].appendChild(closeBtn);
+
+    POPUPS.please_pay = Array.from({ length: 3 }, () => document.createElement('div'));
+    POPUPS.please_pay[0].classList.add('t');
+    POPUPS.please_pay[0].classList.add('pleasePayPopT');
+    POPUPS.please_pay[0].textContent = 'Payment';
+    POPUPS.please_pay[1].classList.add('t');
+    POPUPS.please_pay[1].id = 'paymentT';
+
+    POPUPS.please_pay[2].classList.add('waitPayment');
+
+    let spinner = document.createElement('div');
+    spinner.className = 'spinner sml';
+    POPUPS.please_pay[2].appendChild(spinner);
+
+    POPUPS.please_pay[2].innerHTML += 'Awaiting payment...';
+
+    POPUPS.success = Array.from({ length: 3 }, () => document.createElement('div'));
+    POPUPS.success[0].classList.add('success');
+
+    let span = document.createElement('span');
+    span.textContent = 'L';
+    POPUPS.success[0].appendChild(span);
+
+    POPUPS.success[1].classList.add('t');
+    POPUPS.success[1].classList.add('successPopT');
+    POPUPS.success[1].textContent = 'Thank you for your purchase!';
+
+    POPUPS.success[2].classList.add('t');
+    POPUPS.success[2].textContent = 'Please check discord for more info.';
+
+    POPUPS.success.push(closeBtn);
+}

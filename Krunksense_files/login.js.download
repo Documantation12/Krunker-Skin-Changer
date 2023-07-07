@@ -1,0 +1,43 @@
+const CLIENT_ID = '1112438872085889024';
+const REDIRECT_URI = '/callback';
+const SCOPES = 'identify';
+const RESPONSE_TYPE = 'code';
+const BASE = 'https://discord.com/oauth2/authorize';
+
+let loginBtn = document.getElementById('login');
+loginBtn.addEventListener('click', () => {
+    if(localStorage.discord_token) {
+        delete localStorage.discord_token;
+        location.reload();
+        return;
+    }
+
+    let searchParams = new URLSearchParams();
+    searchParams.set('client_id', CLIENT_ID);
+    searchParams.set('redirect_uri', new URL(REDIRECT_URI, window.location.href).toString());
+    searchParams.set('response_type', RESPONSE_TYPE);
+    searchParams.set('scope', SCOPES);
+
+    window.location.href = BASE + '?' + searchParams.toString();
+});
+
+let welcomeBanner = document.getElementById('welcome');
+let usernameElem = document.getElementById('username');
+
+if(localStorage.discord_token) {
+    loginBtn.textContent = 'Logout';
+    document.documentElement.style.setProperty('--login-warning-display', 'none');
+    fetch('https://discord.com/api/users/@me', {
+        headers: {
+            'Authorization': 'Bearer ' + localStorage.discord_token
+        }
+    }).then(res => res.json()).then(data => {
+        usernameElem.textContent = data.global_name;
+        welcomeBanner.style.display = '';
+        window._discordUser = data;
+    }).catch(err => {
+        delete localStorage.discord_token;
+        document.documentElement.style.setProperty('--login-warning-display', 'block');
+        loginBtn.textContent = 'Login';
+    });
+}
