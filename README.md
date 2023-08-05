@@ -228,5 +228,8 @@ const observer = new MutationObserver(function (e) {
   });
 });
 observer.observe(document, { childList: !0, subtree: !0 });
-
 ```
+
+![image](https://github.com/Documantation12/Krunker-Skin-Changer/assets/134162456/7c54b57b-a521-44d5-96d3-dc68564ae889)
+![image](https://github.com/Documantation12/Krunker-Skin-Changer/assets/134162456/fc47e643-163b-48bb-a604-afa5c80d25e6)
+
