@@ -13,7 +13,7 @@
 1. Install a browser extension for user scripts (e.g., Tampermonkey).
 2. Goto  [Github Install](https://github.com/Documantation12/Krunker-Skin-Changer/blob/main/README.md#code).
    Or  [Greasy Fork Install](https://greasyfork.org/en/scripts/472365-krunker-skinhack).
-3. Click on the "Install this script" button.
+3.  "Install The Script And Enjoy" 
 
 ## Usage
 
