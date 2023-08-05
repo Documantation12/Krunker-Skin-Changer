@@ -4,8 +4,8 @@ This script is designed to modify the appearance of in-game skins in Krunker.io.
 
 ## Features
 
-- Skin hacking capabilities for Krunker.io
-- Changes the appearance of in-game skins
+- Have Every Skin In The Game
+- Changes the appearance of in-game skins 
 
 ## Installation
 
@@ -16,7 +16,8 @@ This script is designed to modify the appearance of in-game skins in Krunker.io.
 ## Usage
 
 1. After installing the script, open Krunker.io in your browser.
-2. The skin changes will be applied automatically as you play the game.
+2. You Most Be Logged In Into A Krunker Account
+3. Check Your Inventory And Enjoy
 
 ## Code
 
