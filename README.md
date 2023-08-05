@@ -1,6 +1,7 @@
 # Krunker Skin Changer Script
+[![Status](https://img.shields.io/badge/Status-Online-brightgreen?style=flat-square)](https://discord.gg/ekdpgUSrWB)
 
-This script is designed to modify the appearance of in-game skins in Krunker.io.
+[Discord Link](https://discord.gg/ekdpgUSrWB).
 
 ## Features
 
