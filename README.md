@@ -1,5 +1,5 @@
 # Krunker Skin Changer Script
-[![Status](https://img.shields.io/badge/Status-Working-brightgreen?style=flat-square)](https://discord.gg/ekdpgUSrWB)
+[![Status](https://img.shields.io/badge/Status-Patched-Red?style=flat-square)](https://discord.gg/ekdpgUSrWB)
 
 [Discord Link](https://discord.gg/ekdpgUSrWB)
 
