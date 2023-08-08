@@ -30,7 +30,7 @@
 // @namespace    krunker
 // @match        *://krunker.io/*
 // @grant        none
-// @version      1.4
+// @version      1.7
 // @icon         https://media.discordapp.net/attachments/1128431056513675339/1128886443843002510/icon.png?width=225&height=187
 // @author       jaguar
 // @description  Krunker.io Skinhack UserScript
